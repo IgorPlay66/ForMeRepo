@@ -7,10 +7,10 @@ from web_gpt.open_ai_helper import OpenAiHelper
 from web_gpt.langchain_helper import LangChainHelper
 
 
-class WebGPT(OpenAiHelper, LangChainHelper):
+class WebGPT(OpenAiHelper):
     def __init__(
             self,
-            model: str = "gpt-3.5-turbo",
+            model: str = "gpt-4o",
             vector_store_model: str = "gpt-3.5-turbo-16k",
             prompt: str = """
             Use the following context snippets to answer the question at the end.
@@ -24,59 +24,32 @@ class WebGPT(OpenAiHelper, LangChainHelper):
             - Study the document, get into its essence, reveal hidden meanings and subtext.
             {context}
             """,
-            urls_count: int = 1,
+            urls_count: int = 3,
             search_region: str = "ru-ru"
     ):
-        """
-        Class based on Open air API and Langchain, seamlessly connecting ChatGPT to the Internet
-        :param model: chat model
-        :param vector_store_model: the model that will search the site, "gpt-3.5-turbo-16k" is recommended
-        :param prompt: instructions for the neural network on how to work with the document, you must add {context} to the end, it is recommended to leave the default
-        :param urls_count: the number of links from which the neural network will take information, it is recommended no more than 3
-        :param search_region: region for internet search, for example "ru-ru"
-        """
         self.urls_count = urls_count
         self.messages = None
         self.open_ai_key = self.get_open_ai_key()
         self.loop = asyncio.get_event_loop()
         self.prompt = prompt
         OpenAiHelper.__init__(self, model)
-        LangChainHelper.__init__(self, vector_store_model, search_region)
         self.open_ai_key = self.get_open_ai_key()
 
-    async def ask(self, messages: list) -> dict:
-        """
-        A method of the Class based on a request to Web GT, if the user's response requires information from the Internet, it will launch LangChain methods, otherwise
-        WebGPT will give a normal response
-
-        The response is returned as a dict:
-        If the response did not require the Internet: {"type": "def", "content": "Response"}
-        If the response required the Internet: {"type": "web", "content": "Response", "vectorstore": "formatted information source"}
-
-        :param messages: list of messages, more details https://platform.openai.com/docs/api-reference/chat
-        """
-        self.messages = messages
-        chat_completion = await self.chat_completion(messages=self.messages)
+    async def ask(self, history: list, prompt: str, endpoint: str = None, key: str = None, model: str = None) -> dict:
+        chat_completion = await self.chat_completion(messages=history, endpoint=endpoint, key=key, model=model)
         try:
             if chat_completion["choices"][0]["message"]["content"] is not None:
                 return {"type": "def", "content": chat_completion["choices"][0]["message"]["content"]}
-            llm_answer = await self.vector_store_asq(json.loads(chat_completion["choices"][0]["message"]["function_call"]["arguments"])["query"])
+            llm_answer = await self.vector_store_asq(
+                json.loads(chat_completion["choices"][0]["message"]["function_call"]["arguments"])["query"],
+                prompt=prompt)
             return {"type": "web", "content": llm_answer["content"], "vectorstore": llm_answer["vectorstore"]}
         except Exception as e:
             raise Exception(e)
 
-    async def vector_store_asq(self, query=None, old_vectorstore=None, messages: list = None) -> dict:
-        """
-        A method of the Class based on a request to an already existing vectorstore
-        WebGPT will give a normal response
-
-        The response is returned as a dict:
-        {"content": "Response", "vectorstore": vectorstore}
-
-        :param old_vectorstore: formatted information source that is returned in the ask method
-        :param messages: list of messages, more details https://platform.openai.com/docs/api-reference/chat
-        """
-        template = self.prompt
+    async def vector_store_asq(self, query=None, old_vectorstore=None, messages: list = None,
+                               prompt: str = None) -> dict:
+        template = prompt if prompt else self.prompt
         if old_vectorstore is None:
             query = await self.find_links(query)
             if len(query["text"]) < 2:
@@ -88,15 +61,14 @@ class WebGPT(OpenAiHelper, LangChainHelper):
             template += "\n\nВопрос пользователя: {question}\nОтвет полезного помощника, который следует инструкциям:"
         else:
             vectorstore = (await self.create_index(all_splits=old_vectorstore))[0]
-            self.messages = messages
-            if len(self.messages) > 1:
-                for message in self.messages[:-1]:
+            if messages:
+                for message in messages[:-1]:
                     if message["role"] == "user":
                         template += f"Вопрос пользователя: {message['content']}"
                     else:
                         template += f"Ответ полезного помощника, который следует инструкциям: {message['content']}"
             template += "Вопрос пользователя: {question}\nОтвет полезного помощника, который следует инструкциям:"
-            last_query = self.messages[-1]["content"]
+            last_query = messages[-1]["content"]
 
         result = await self.llm_asq(template=template, vectorstore=vectorstore, last_query=last_query)
 
