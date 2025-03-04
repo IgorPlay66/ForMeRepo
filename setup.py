@@ -8,7 +8,7 @@ def readme():
 
 setup(
     name='web_gpt',
-    version='1.0.0',
+    version='1.0.1',
     author='ZeroN',
     author_email='dotdot20072607@gmail.com',
     description='WebGPT is a library based on the Openal API and Long Chain. It allows you to connect ChatGPT to the Internet without a seam to make requests and receive responses with up-to-date information.',
