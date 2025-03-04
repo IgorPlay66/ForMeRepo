@@ -25,13 +25,14 @@ class OpenAiHelper:
         ]
 
     async def chat_completion(self, messages, endpoint=None, key=None, model=None):
-        openai.api_key = key if key else self.get_open_ai_key()
-        openai.api_base = endpoint if endpoint else "https://api.openai.com/v1"
+        openai.api_key = key
+        openai.api_base = endpoint
         return await openai.ChatCompletion.acreate(
-            model=model if model else self.model,
+            model=model,
             messages=messages,
             functions=self.functions
         )
+
 
     @staticmethod
     def get_open_ai_key():
