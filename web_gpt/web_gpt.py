@@ -1,11 +1,8 @@
-# -*- coding: utf-8 -*-
 import asyncio
 import json
 import re
-
 from web_gpt.open_ai_helper import OpenAiHelper
 from web_gpt.langchain_helper import LangChainHelper
-
 
 class WebGPT(OpenAiHelper):
     def __init__(
@@ -29,11 +26,9 @@ class WebGPT(OpenAiHelper):
     ):
         self.urls_count = urls_count
         self.messages = None
-        self.open_ai_key = self.get_open_ai_key()
         self.loop = asyncio.get_event_loop()
         self.prompt = prompt
         OpenAiHelper.__init__(self, model)
-        self.open_ai_key = self.get_open_ai_key()
 
     async def ask(self, history: list, prompt: str, endpoint: str = None, key: str = None, model: str = None) -> dict:
         chat_completion = await self.chat_completion(messages=history, endpoint=endpoint, key=key, model=model)
